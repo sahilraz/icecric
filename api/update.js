@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     const result = await response.json();
 
     if (result.success) {
-      return res.status(200).send(`✅ Payment ${action === 'approve' ? 'approved' : 'rejected'} successfully.`);
+      return res.status(200).send(`✅ Payment ${action === 'approve' ? 'approved' : 'rejected'} successfully. Made by Devil.`);
     } else {
       return res.status(500).send(`❌ Failed: ${result.message}`);
     }
