@@ -6,51 +6,53 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = await req.json();
+    const body = req.body;
 
-    // ✅ Check if it's a callback query from Telegram
     if (!body.callback_query || !body.callback_query.data) {
-      return res.status(400).send("❌ Invalid Telegram callback");
+      return res.status(400).send("❌ Invalid Telegram callback payload.");
     }
 
-    const { data } = body.callback_query;
-    const [action, id] = data.split("_");
+    const { data, id: callbackId } = body.callback_query;
+    const [action, recordId] = data.split("_");
 
-    if (!id || !["approve", "reject"].includes(action)) {
-      return res.status(400).send("❌ Invalid callback format");
+    if (!recordId || !["approve", "reject"].includes(action)) {
+      return res.status(400).send("❌ Invalid callback format.");
     }
 
-    // ✅ Prepare data to send to your PHP server
-    const postData = {
-      id: parseInt(id),
-      action: action
-    };
-
-    // 🔄 Forward to your PHP API
-    const response = await fetch("https://icecric.online/check_recharge.php", {
+    // Make POST request to your PHP server
+    const phpResponse = await fetch("https://icecric.online/check_recharge.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(postData)
+      body: JSON.stringify({ id: parseInt(recordId), action })
     });
 
-    const result = await response.json();
+    let resultText = "❌ Unknown error";
+    let success = false;
 
-    // ✅ Notify Telegram that the callback was handled
+    if (phpResponse.ok) {
+      const result = await phpResponse.json();
+      success = result.success;
+      resultText = result.success
+        ? `✅ Payment ${action === "approve" ? "approved" : "rejected"}!`
+        : `❌ ${result.message || "Update failed"}`;
+    } else {
+      resultText = `❌ PHP Server Error: ${phpResponse.statusText}`;
+    }
+
+    // Answer the Telegram callback to avoid "pending updates"
     await fetch(`https://api.telegram.org/bot7149543362:AAG5u2YExDPeko8uR8QzeBnQfeYp6mTj_uA/answerCallbackQuery`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        callback_query_id: body.callback_query.id,
-        text: result.success
-          ? `✅ Payment ${action}ed successfully.`
-          : `❌ Failed: ${result.message || 'Unknown error'}`,
+        callback_query_id: callbackId,
+        text: resultText,
         show_alert: true
       })
     });
 
-    return res.status(200).json({ ok: true });
+    res.status(200).json({ ok: true });
   } catch (error) {
-    console.error("Webhook error:", error);
-    return res.status(500).send("❌ Internal Server Error");
+    console.error("Webhook error:", error.message);
+    res.status(500).json({ error: "Webhook internal error" });
   }
 }
