@@ -1,8 +1,18 @@
 {
   "version": 2,
+  "functions": {
+    "api/update.js": {
+      "memory": 128,
+      "maxDuration": 10
+    }
+  },
   "routes": [
     {
       "src": "/api/update",
+      "methods": ["POST"],
+      "headers": {
+        "Content-Type": "application/json"
+      },
       "dest": "/api/update.js"
     }
   ]
